@@ -238,6 +238,52 @@ async def download_file(filename: str):
         filename=filename,
         media_type="application/octet-stream"
     )
+    
+    
+@app.get("/download/{filename}")
+async def download_public_file(filename: str):
+    """Public endpoint to download a file by filename"""
+    # Check both pending and processed directories
+    pending_path = os.path.join(PENDING_DIR, filename)
+    processed_path = os.path.join(PROCESSED_DIR, filename)
+    
+    if os.path.exists(pending_path):
+        file_path = pending_path
+    elif os.path.exists(processed_path):
+        file_path = processed_path
+    else:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type based on file extension
+    content_type = "application/octet-stream"  # Default
+    if is_image_file(filename):
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in ['.jpg', '.jpeg']:
+            content_type = "image/jpeg"
+        elif ext == '.png':
+            content_type = "image/png"
+        elif ext == '.gif':
+            content_type = "image/gif"
+        elif ext == '.bmp':
+            content_type = "image/bmp"
+    elif is_audio_file(filename):
+        ext = os.path.splitext(filename)[1].lower()
+        if ext == '.mp3':
+            content_type = "audio/mpeg"
+        elif ext == '.wav':
+            content_type = "audio/wav"
+        elif ext == '.ogg':
+            content_type = "audio/ogg"
+        elif ext == '.aac':
+            content_type = "audio/aac"
+        elif ext == '.flac':
+            content_type = "audio/flac"
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type=content_type
+    )
 
 
 @app.on_event("startup")
@@ -247,7 +293,7 @@ async def startup_event():
     print(f"Maximum image size: {MAX_IMAGE_SIZE/1024}KB")
     # Load persisted metadata if available
     load_persisted_metadata()
-
+    
 
 @app.get("/admin/files-debug")
 async def debug_file_system():
@@ -278,7 +324,7 @@ async def debug_file_system():
             result["pending_sizes"][file] = os.path.getsize(file_path)
     
     return result
-    
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
