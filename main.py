@@ -8,6 +8,8 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
+from PIL import Image
+import io
 
 # Configuration
 MAX_IMAGE_SIZE = 50 * 1024  # 50KB
@@ -65,6 +67,39 @@ def save_file_info(file_info: FileInfo):
     # Keep the list from growing too large
     if len(file_db) > 100:
         file_db.pop(0)
+        
+
+def convert_to_baseline_jpeg(file_path):
+    """Convert any image to a baseline JPEG compatible with ESP32"""
+    try:
+        # Open the image
+        img = Image.open(file_path)
+        
+        # Convert to RGB if needed
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Create a new file path with standard name
+        base_path = os.path.dirname(file_path)
+        new_path = os.path.join(base_path, "image.jpg")
+        
+        # Save as baseline JPEG with settings compatible with ESP32
+        img.save(new_path, 
+                format="JPEG", 
+                quality=85, 
+                optimize=False, 
+                progressive=False, 
+                subsampling=0)  # 4:4:4 chroma subsampling
+        
+        # If this isn't the original path, remove the original file
+        if new_path != file_path:
+            os.remove(file_path)
+            
+        print(f"Converted image saved to {new_path}")
+        return new_path
+    except Exception as e:
+        print(f"Error converting image: {e}")
+        return file_path
 
 
 def mark_as_processed(file_path: str):
@@ -180,24 +215,28 @@ async def upload_file(file: UploadFile = File(...)):
     if not (is_image_file(filename) or is_audio_file(filename)):
         raise HTTPException(status_code=400, detail="File must be an image or audio file")
     
+    # Create full file path
+    file_path = os.path.join(PENDING_DIR, filename)
+    
     # For images, check size limit and delete any existing image files
     if is_image_file(filename):
         contents = await file.read()
         if len(contents) > MAX_IMAGE_SIZE:
             raise HTTPException(status_code=400, detail=f"Image size exceeds {MAX_IMAGE_SIZE/1024}KB limit")
         
-        # Delete any existing image files in both pending and processed directories
+        # Delete any existing image files
         delete_existing_images()
-        
-        # Create full file path
-        file_path = os.path.join(PENDING_DIR, filename)
         
         # Write the file
         with open(file_path, "wb") as f:
             f.write(contents)
+        
+        # Convert to ESP32-compatible format and get new path
+        # This always saves as "image.jpg" in the same directory
+        file_path = convert_to_baseline_jpeg(file_path)
+        filename = os.path.basename(file_path)  # Will always be "image.jpg"
     else:
         # For audio files, stream directly to disk
-        file_path = os.path.join(PENDING_DIR, filename)
         with open(file_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
     
