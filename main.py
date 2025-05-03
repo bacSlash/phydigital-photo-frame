@@ -249,5 +249,36 @@ async def startup_event():
     load_persisted_metadata()
 
 
+@app.get("/admin/files-debug")
+async def debug_file_system():
+    """Endpoint to debug the file system and see what's in the uploads directory"""
+    result = {
+        "tmp_exists": os.path.exists("/tmp"),
+        "upload_dir_exists": os.path.exists(UPLOAD_DIR),
+        "pending_dir_exists": os.path.exists(PENDING_DIR),
+        "processed_dir_exists": os.path.exists(PROCESSED_DIR),
+        "pending_files": [],
+        "processed_files": [],
+        "metadata_exists": os.path.exists(os.path.join(UPLOAD_DIR, "metadata.json")),
+    }
+    
+    # List files in pending directory
+    if os.path.exists(PENDING_DIR):
+        result["pending_files"] = os.listdir(PENDING_DIR)
+    
+    # List files in processed directory
+    if os.path.exists(PROCESSED_DIR):
+        result["processed_files"] = os.listdir(PROCESSED_DIR)
+    
+    # Add file sizes
+    result["pending_sizes"] = {}
+    for file in result["pending_files"]:
+        file_path = os.path.join(PENDING_DIR, file)
+        if os.path.isfile(file_path):
+            result["pending_sizes"][file] = os.path.getsize(file_path)
+    
+    return result
+    
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
