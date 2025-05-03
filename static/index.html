@@ -199,13 +199,14 @@
         });
         
         // Function to fetch and display the list of uploaded files
+        // Update the fetchFileList function in index.html
         async function fetchFileList() {
             try {
                 const response = await fetch('/files');
                 if (response.ok) {
                     const files = await response.json();
                     const fileList = document.getElementById('fileList');
-                    
+            
                     // Clear current list
                     fileList.innerHTML = '';
                     
@@ -215,9 +216,18 @@
                     } else {
                         files.forEach(file => {
                             const li = document.createElement('li');
-                            li.textContent = file.name + ' - ' + 
-                                (file.size / 1024).toFixed(2) + ' KB - ' + 
-                                new Date(file.uploaded_at).toLocaleString();
+                    
+                            // Create download link
+                            const downloadLink = document.createElement('a');
+                            downloadLink.href = `/download/${file.name}`;
+                            downloadLink.textContent = file.name;
+                            downloadLink.target = '_blank';
+                    
+                            li.appendChild(downloadLink);
+                            li.appendChild(document.createTextNode(
+                                ` - ${(file.size / 1024).toFixed(2)} KB - ${new Date(file.uploaded_at).toLocaleString()} - ${file.status}`
+                            ));
+                    
                             fileList.appendChild(li);
                         });
                     }
