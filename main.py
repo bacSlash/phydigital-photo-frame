@@ -70,7 +70,7 @@ def save_file_info(file_info: FileInfo):
         
 
 def convert_to_baseline_jpeg(file_path):
-    """Convert any image to a baseline JPEG compatible with ESP32"""
+    """Convert any image to a baseline JPEG compatible with ESP32 and resize to 320x480px"""
     try:
         # Open the image
         img = Image.open(file_path)
@@ -78,6 +78,9 @@ def convert_to_baseline_jpeg(file_path):
         # Convert to RGB if needed
         if img.mode != 'RGB':
             img = img.convert('RGB')
+        
+        # Resize the image to 320x480px
+        img = img.resize((320, 480), Image.LANCZOS)
         
         # Create a new file path with standard name
         base_path = os.path.dirname(file_path)
@@ -95,7 +98,7 @@ def convert_to_baseline_jpeg(file_path):
         if new_path != file_path:
             os.remove(file_path)
             
-        print(f"Converted image saved to {new_path}")
+        print(f"Converted and resized image saved to {new_path}")
         return new_path
     except Exception as e:
         print(f"Error converting image: {e}")
