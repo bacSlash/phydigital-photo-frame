@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 File Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .upload-container {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .file-upload {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        
+        .file-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .submit-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .submit-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .upload-status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        
+        .file-list {
+            margin-top: 30px;
+        }
+        
+        .file-list h2 {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        progress {
+            width: 100%;
+            height: 20px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ESP32 File Upload System</h1>
+    
+    <div class="upload-container">
+        <h2>Upload Files to ESP32</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="file-upload">
+                <label for="imageFile">Upload Image (Max 50KB):</label>
+                <input type="file" id="imageFile" name="file" class="file-input" accept="image/*">
+            </div>
+            
+            <div class="file-upload">
+                <label for="soundFile">Upload Sound File:</label>
+                <input type="file" id="soundFile" name="file" class="file-input" accept="audio/*">
+            </div>
+            
+            <button type="submit" class="submit-btn">Upload Files</button>
+            <progress id="uploadProgress" value="0" max="100" style="display: none;"></progress>
+        </form>
+        
+        <div id="uploadStatus" class="upload-status"></div>
+    </div>
+    
+    <div class="file-list">
+        <h2>Recent Uploads</h2>
+        <ul id="fileList">
+            <!-- Files will be listed here via JavaScript -->
+        </ul>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const imageFile = document.getElementById('imageFile').files[0];
+            const soundFile = document.getElementById('soundFile').files[0];
+            const uploadStatus = document.getElementById('uploadStatus');
+            const uploadProgress = document.getElementById('uploadProgress');
+            
+            // Check if either file is selected
+            if (!imageFile && !soundFile) {
+                uploadStatus.className = 'upload-status error';
+                uploadStatus.textContent = 'Please select at least one file to upload.';
+                return;
+            }
+            
+            // Check image file size (50KB limit)
+            if (imageFile && imageFile.size > 50 * 1024) {
+                uploadStatus.className = 'upload-status error';
+                uploadStatus.textContent = 'Image file size exceeds the 50KB limit.';
+                return;
+            }
+            
+            // Create FormData
+            const formData = new FormData();
+            if (imageFile) formData.append('file', imageFile);
+            if (soundFile) formData.append('file', soundFile);
+            
+            // Show progress bar
+            uploadProgress.style.display = 'block';
+            uploadProgress.value = 0;
+            
+            try {
+                // Upload the file(s)
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload');
+                
+                xhr.upload.onprogress = function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        uploadProgress.value = percentComplete;
+                    }
+                };
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        uploadStatus.className = 'upload-status success';
+                        uploadStatus.textContent = 'Files uploaded successfully!';
+                        
+                        // Reset form
+                        document.getElementById('uploadForm').reset();
+                        
+                        // Update file list
+                        fetchFileList();
+                    } else {
+                        uploadStatus.className = 'upload-status error';
+                        uploadStatus.textContent = 'Upload failed: ' + xhr.statusText;
+                    }
+                    uploadProgress.style.display = 'none';
+                };
+                
+                xhr.onerror = function() {
+                    uploadStatus.className = 'upload-status error';
+                    uploadStatus.textContent = 'Upload failed. Please try again.';
+                    uploadProgress.style.display = 'none';
+                };
+                
+                xhr.send(formData);
+                
+            } catch (error) {
+                uploadStatus.className = 'upload-status error';
+                uploadStatus.textContent = 'Upload error: ' + error.message;
+                uploadProgress.style.display = 'none';
+            }
+        });
+        
+        // Function to fetch and display the list of uploaded files
+        async function fetchFileList() {
+            try {
+                const response = await fetch('/files');
+                if (response.ok) {
+                    const files = await response.json();
+                    const fileList = document.getElementById('fileList');
+                    
+                    // Clear current list
+                    fileList.innerHTML = '';
+                    
+                    // Add files to list
+                    if (files.length === 0) {
+                        fileList.innerHTML = '<li>No files uploaded yet.</li>';
+                    } else {
+                        files.forEach(file => {
+                            const li = document.createElement('li');
+                            li.textContent = file.name + ' - ' + 
+                                (file.size / 1024).toFixed(2) + ' KB - ' + 
+                                new Date(file.uploaded_at).toLocaleString();
+                            fileList.appendChild(li);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching file list:', error);
+            }
+        }
+        
+        // Fetch file list on page load
+        document.addEventListener('DOMContentLoaded', fetchFileList);
+    </script>
+</body>
+</html>
