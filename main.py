@@ -98,6 +98,7 @@ def save_file_info(file_info: FileInfo):
                 {
                     "name": item.name,
                     "size": item.size,
+                    "path": item.path,  # Include the path
                     "type": item.type,
                     "uploaded_at": item.uploaded_at,
                     "status": item.status
@@ -107,6 +108,7 @@ def save_file_info(file_info: FileInfo):
             json.dump(metadata, f)
     except Exception as e:
         print(f"Error persisting metadata: {e}")
+        
         
 def load_persisted_metadata():
     try:
