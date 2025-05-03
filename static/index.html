@@ -214,20 +214,29 @@
                     if (files.length === 0) {
                         fileList.innerHTML = '<li>No files uploaded yet.</li>';
                     } else {
+                        // In index.html fetchFileList function
                         files.forEach(file => {
                             const li = document.createElement('li');
-                    
+    
                             // Create download link
                             const downloadLink = document.createElement('a');
                             downloadLink.href = `/download/${file.name}`;
                             downloadLink.textContent = file.name;
                             downloadLink.target = '_blank';
-                    
+    
+                            // Check if uploaded_at is a valid timestamp
+                            let dateDisplay;
+                            if (file.uploaded_at && file.uploaded_at > 1000000000) { // Basic check for valid timestamp
+                            dateDisplay = new Date(file.uploaded_at * 1000).toLocaleString();
+                            } else {
+                                dateDisplay = "Unknown date";
+                            }   
+    
                             li.appendChild(downloadLink);
                             li.appendChild(document.createTextNode(
-                                ` - ${(file.size / 1024).toFixed(2)} KB - ${new Date(file.uploaded_at).toLocaleString()} - ${file.status}`
+                                ` - ${(file.size / 1024).toFixed(2)} KB - ${dateDisplay} - ${file.status}`
                             ));
-                    
+    
                             fileList.appendChild(li);
                         });
                     }
