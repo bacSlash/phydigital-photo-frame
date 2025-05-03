@@ -82,6 +82,35 @@ def mark_as_processed(file_path: str):
                 
                 save_file_info(file_info)  # Save updated info
                 
+
+def delete_existing_images():
+    """Delete all image files from pending and processed directories"""
+    # Delete from pending directory
+    for filename in os.listdir(PENDING_DIR):
+        filepath = os.path.join(PENDING_DIR, filename)
+        if os.path.isfile(filepath) and is_image_file(filename):
+            try:
+                os.remove(filepath)
+                print(f"Deleted existing image: {filepath}")
+            except Exception as e:
+                print(f"Error deleting {filepath}: {e}")
+    
+    # Delete from processed directory
+    for filename in os.listdir(PROCESSED_DIR):
+        filepath = os.path.join(PROCESSED_DIR, filename)
+        if os.path.isfile(filepath) and is_image_file(filename):
+            try:
+                os.remove(filepath)
+                print(f"Deleted existing image: {filepath}")
+            except Exception as e:
+                print(f"Error deleting {filepath}: {e}")
+
+def clear_image_metadata():
+    """Remove all image files from the metadata database"""
+    global file_db
+    # Keep only non-image files
+    file_db = [f for f in file_db if f.type != "image"]
+                
                 
 def save_file_info(file_info: FileInfo):
     file_db.append(file_info)
@@ -151,25 +180,33 @@ async def upload_file(file: UploadFile = File(...)):
     if not (is_image_file(filename) or is_audio_file(filename)):
         raise HTTPException(status_code=400, detail="File must be an image or audio file")
     
-    # Create full file path
-    file_path = os.path.join(PENDING_DIR, filename)
-    
-    # For images, check size limit
+    # For images, check size limit and delete any existing image files
     if is_image_file(filename):
         contents = await file.read()
         if len(contents) > MAX_IMAGE_SIZE:
             raise HTTPException(status_code=400, detail=f"Image size exceeds {MAX_IMAGE_SIZE/1024}KB limit")
+        
+        # Delete any existing image files in both pending and processed directories
+        delete_existing_images()
+        
+        # Create full file path
+        file_path = os.path.join(PENDING_DIR, filename)
         
         # Write the file
         with open(file_path, "wb") as f:
             f.write(contents)
     else:
         # For audio files, stream directly to disk
+        file_path = os.path.join(PENDING_DIR, filename)
         with open(file_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
     
     file_size = os.path.getsize(file_path)
     file_type = "image" if is_image_file(filename) else "audio"
+    
+    # Clear existing files from metadata
+    if file_type == "image":
+        clear_image_metadata()
     
     # Create and save file info
     file_info = FileInfo(
